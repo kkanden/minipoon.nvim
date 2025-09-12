@@ -31,6 +31,7 @@ local function get_root()
 	return root
 end
 
+---@param root RootPath
 local function make_root_key(root)
 	local git_root = vim.fs.root(0, ".git")
 	if not git_root then
@@ -78,6 +79,7 @@ function Marks:new()
 	return marks
 end
 
+---@return Marks
 function Marks:_get_list()
 	local root_key = make_root_key(self.root)
 	if not self.list[root_key] then
@@ -96,6 +98,7 @@ function Marks:_get_next_index()
 	return tostring(vim.tbl_count(self:_get_list()) + 1)
 end
 
+---@return FilePath[]
 function Marks:_get_mark_names()
 	local mark_names = {}
 	local list = self:_get_list()
@@ -108,6 +111,7 @@ function Marks:_get_mark_names()
 	return mark_names
 end
 
+---@param mark_name FilePath
 ---@return string?
 function Marks:_get_index_from_mark(mark_name)
 	for i, v in ipairs(self:_get_mark_names()) do
@@ -118,21 +122,26 @@ function Marks:_get_index_from_mark(mark_name)
 	return nil
 end
 
-function Marks:_get_pos(mark_entry_name)
+---@param mark_name FilePath
+---@return MarkPos
+function Marks:_get_pos(mark_name)
 	local tbl = vim.tbl_values(self:_get_list())
 	local pos_tbl = vim.iter(tbl)
 		:filter(function(x)
-			return vim.tbl_keys(x)[1] == mark_entry_name
+			return vim.tbl_keys(x)[1] == mark_name
 		end)
 		:totable()
-	local pos = pos_tbl[1][mark_entry_name]
-	return { pos.row, pos.col }
+	local pos = pos_tbl[1][mark_name]
+	return { row = pos.row, col = pos.col }
 end
 
+---@param mark_name FilePath
+---@return boolean
 function Marks:_mark_in_list(mark_name)
 	return vim.tbl_contains(self:_get_mark_names(), mark_name)
 end
 
+---@param marks_to_keep FilePath[]
 function Marks:_update_marks(marks_to_keep)
 	local mark_list = {}
 
@@ -147,10 +156,11 @@ function Marks:_update_marks(marks_to_keep)
 	self:_set_list(mark_list)
 end
 
-function Marks:_open(mark_entry_name)
+---@param mark_name FilePath
+function Marks:_open(mark_name)
 	self:toggle_window()
 
-	local file_path = mark_entry_name
+	local file_path = mark_name
 	if vim.fn.isabsolutepath(file_path) == 0 then
 		file_path = vim.fs.joinpath(self.root, file_path)
 	end
@@ -168,8 +178,8 @@ function Marks:_open(mark_entry_name)
 	vim.api.nvim_set_current_buf(buf)
 
 	if should_set_cursor then
-		local pos = self:_get_pos(mark_entry_name)
-		vim.api.nvim_win_set_cursor(0, pos)
+		local pos = self:_get_pos(mark_name)
+		vim.api.nvim_win_set_cursor(0, { pos.row, pos.col })
 	end
 end
 
