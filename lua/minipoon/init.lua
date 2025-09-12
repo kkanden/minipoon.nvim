@@ -293,4 +293,11 @@ vim.api.nvim_create_autocmd("QuitPre", {
 	end,
 })
 
+vim.api.nvim_create_autocmd("DirChanged", {
+	group = augroup,
+	callback = function()
+		marks.root = get_root()
+	end,
+})
+
 return marks
