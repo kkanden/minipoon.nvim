@@ -123,6 +123,12 @@ function Marks:_get_index_from_mark(mark_name)
 	return nil
 end
 
+---@param index integer
+---@return FilePath
+function Marks:_get_mark_name_from_index(index)
+	return vim.tbl_keys(self:_get_list()[index])[1]
+end
+
 ---@param mark_name FilePath
 ---@return MarkPos
 function Marks:_get_pos(mark_name)
@@ -197,6 +203,12 @@ function Marks:close_window()
 	if vim.api.nvim_win_is_valid(window.win) then
 		vim.api.nvim_win_close(window.win, true)
 	end
+end
+
+---@param index integer
+function Marks:open_at(index)
+	local mark_name = self:_get_mark_name_from_index(index)
+	self:_open(mark_name)
 end
 
 function Marks:toggle_window()
@@ -284,7 +296,6 @@ end
 
 local marks = Marks:new()
 
-	group = augroup,
 vim.api.nvim_create_autocmd("QuitPre", {
 	group = augroup,
 	callback = function()
