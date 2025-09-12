@@ -23,10 +23,11 @@ local marks_list_global = vim.json.decode(lines)
 
 ---@return RootPath
 local function get_root()
-	local git_root = vim.fs.root(0, ".git")
+	local cwd = vim.uv.cwd() or 0 -- if for some reason couldn't get cwd use current buffer
+	local git_root = vim.fs.root(cwd, ".git")
 	local root = git_root or vim.uv.cwd()
 	if not root then
-		error("minipoon: couldn't get root directory: ")
+		error("minipoon: couldn't get root directory")
 	end
 	root = vim.fs.normalize(root)
 	return root
@@ -40,7 +41,7 @@ local function make_root_key(root)
 	end
 	local root_key = root
 	local branch = vim.system({ "git", "branch", "--show-current" }):wait()["stdout"]:gsub("\n", "")
-	if branch then
+	if branch and branch ~= "" then
 		root_key = string.format("%s-%s", root_key, branch)
 	end
 	return root_key
