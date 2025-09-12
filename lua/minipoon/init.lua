@@ -158,7 +158,9 @@ end
 
 ---@param mark_name FilePath
 function Marks:_open(mark_name)
-	self:toggle_window()
+	if vim.api.nvim_win_is_valid(window.win) then
+		self:close_window()
+	end
 
 	local file_path = mark_name
 	if vim.fn.isabsolutepath(file_path) == 0 then
