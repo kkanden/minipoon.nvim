@@ -1,7 +1,7 @@
 ---@alias RootPath string Absolute path of the project root with an optional git branch appended.
 ---@alias FilePath string Path of a file, relative if inside project, absolute otherwise.
 ---@alias MarkPos { row: integer, col: integer } Position of the mark.
----@alias Marks table<FilePath, table<integer, MarkPos>> Key-value table of files in project and their mark position.
+---@alias Marks table<FilePath, MarkPos> Key-value table of files in project and their mark position.
 ---@alias MarksList table<RootPath, Marks> Key-value table of RootPaths with all their existing marks.
 
 -- setup
@@ -95,7 +95,7 @@ function Marks:_set_list(list)
 end
 
 function Marks:_get_next_index()
-	return tostring(vim.tbl_count(self:_get_list()) + 1)
+	return vim.tbl_count(self:_get_list()) + 1
 end
 
 ---@return FilePath[]
@@ -103,7 +103,6 @@ function Marks:_get_mark_names()
 	local mark_names = {}
 	local list = self:_get_list()
 	for i = 1, vim.tbl_count(list) do
-		i = tostring(i)
 		local mark = list[i]
 		local mark_name = vim.tbl_keys(mark)[1]
 		table.insert(mark_names, mark_name)
@@ -112,11 +111,11 @@ function Marks:_get_mark_names()
 end
 
 ---@param mark_name FilePath
----@return string?
+---@return integer?
 function Marks:_get_index_from_mark(mark_name)
 	for i, v in ipairs(self:_get_mark_names()) do
 		if v == mark_name then
-			return tostring(i)
+			return i
 		end
 	end
 	return nil
@@ -149,7 +148,7 @@ function Marks:_update_marks(marks_to_keep)
 	for i, filename in ipairs(marks_to_keep) do
 		if self:_mark_in_list(filename) then
 			local mark_index = self:_get_index_from_mark(filename)
-			mark_list[tostring(i)] = self:_get_list()[mark_index]
+			mark_list[i] = self:_get_list()[mark_index]
 		end
 	end
 
@@ -263,7 +262,7 @@ function Marks:toggle_window()
 		width = 50,
 		col = math.floor((vim.o.columns - 50) / 2),
 		row = math.floor((vim.o.lines - 10) / 2),
-		title = " my marks ",
+		title = " minipoon ",
 		title_pos = "center",
 		border = "rounded",
 	}
