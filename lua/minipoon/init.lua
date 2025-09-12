@@ -38,7 +38,7 @@ local function make_root_key(root)
 		return root
 	end
 	local root_key = root
-	local branch = vim.system({ "git", "branch", "--show-current" }):wait()["stdout"]
+	local branch = vim.system({ "git", "branch", "--show-current" }):wait()["stdout"]:gsub("\n", "")
 	if branch then
 		root_key = string.format("%s-%s", root_key, branch)
 	end
@@ -276,17 +276,13 @@ function Marks:toggle_window()
 	window = { buf = buf, win = win }
 end
 
-vim.api.nvim_create_autocmd({ "QuitPre" }, {
+local marks = Marks:new()
+
+vim.api.nvim_create_autocmd("QuitPre", {
 	callback = function()
-		for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-			local filetype = vim.bo[buf].filetype
-			if filetype == "minipoon" then
-				vim.api.nvim_buf_delete(buf, { force = true })
-			end
-		end
+		local json = vim.json.encode(marks.list)
+		vim.fn.writefile({ json }, data_file)
 	end,
 })
-
-local marks = Marks:new()
 
 return marks
