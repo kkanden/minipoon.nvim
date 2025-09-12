@@ -191,7 +191,9 @@ function Marks:add_mark()
 end
 
 function Marks:close_window()
-	vim.api.nvim_win_close(window.win, true)
+	if vim.api.nvim_win_is_valid(window.win) then
+		vim.api.nvim_win_close(window.win, true)
+	end
 end
 
 function Marks:toggle_window()
@@ -237,9 +239,11 @@ function Marks:toggle_window()
 		end,
 	})
 
-	vim.api.nvim_create_autocmd("VimLeavePre", {
+	vim.api.nvim_create_autocmd("QuitPre", {
 		callback = function()
-			vim.api.nvim_buf_delete(buf, {})
+			if vim.api.nvim_buf_is_valid(buf) then
+				vim.api.nvim_buf_delete(buf, { force = true })
+			end
 		end,
 	})
 
