@@ -70,10 +70,11 @@ local window = {
 
 local Marks = {}
 
-function Marks:new()
+---@param win_config? vim.api.keyset.win_config
+function Marks:new(win_config)
 	local marks = setmetatable({
 		root = get_root(),
-		win_config = {},
+		win_config = win_config or {},
 		list = marks_list_global,
 	}, {
 		__index = Marks,
@@ -214,7 +215,6 @@ end
 function Marks:toggle_window()
 	local buf = window.buf
 	local win = window.win
-	local win_config = self.win_config or {}
 
 	if vim.api.nvim_win_is_valid(win) then
 		self:close_window()
@@ -228,7 +228,7 @@ function Marks:toggle_window()
 	vim.bo[buf].swapfile = false
 	vim.bo[buf].buflisted = false
 	vim.bo[buf].filetype = "minipoon"
-	vim.bo[buf].buftype = "acwrite"
+	vim.bo[buf].buftype = "acwrite" -- custom :write behavior
 
 	if vim.api.nvim_buf_get_name(buf) == "" then
 		vim.api.nvim_buf_set_name(buf, get_menu_name())
@@ -274,13 +274,15 @@ function Marks:toggle_window()
 		self:close_window()
 	end, { buffer = buf })
 
+	local width = math.floor(vim.o.columns * 0.3)
+	local height = math.max(math.floor(vim.o.lines * 0.15), 5) -- at least 5 lines
 	---@type vim.api.keyset.win_config
 	local default_opts = {
 		relative = "editor",
-		height = 10,
-		width = 50,
-		col = math.floor((vim.o.columns - 50) / 2),
-		row = math.floor((vim.o.lines - 10) / 2),
+		width = width,
+		height = height,
+		col = math.floor((vim.o.columns - width) / 2),
+		row = math.floor((vim.o.lines - height) / 2),
 		title = " minipoon ",
 		title_pos = "center",
 		border = "rounded",
@@ -289,8 +291,12 @@ function Marks:toggle_window()
 	local contents = self:_get_mark_names()
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, contents)
 
-	win_config = vim.tbl_deep_extend("force", win_config, default_opts)
+	local win_config = vim.tbl_deep_extend("force", self.win_config, default_opts)
 	local win = vim.api.nvim_open_win(buf, true, win_config)
+
+	vim.wo[win].number = true
+	vim.wo[win].relativenumber = false
+
 	window = { buf = buf, win = win }
 end
 
