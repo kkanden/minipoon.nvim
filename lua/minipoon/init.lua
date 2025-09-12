@@ -5,6 +5,7 @@
 ---@alias MarksList table<RootPath, Marks> Key-value table of RootPaths with all their existing marks.
 
 -- setup
+local augroup = vim.api.nvim_create_augroup("minipoon", {})
 local data_dir = vim.fs.joinpath(vim.fn.stdpath("data"), "minipoon")
 local data_file = vim.fs.joinpath(data_dir, "marks.json")
 
@@ -219,6 +220,7 @@ function Marks:toggle_window()
 	end
 
 	vim.api.nvim_create_autocmd("BufWriteCmd", {
+		group = augroup,
 		buffer = buf,
 		callback = function()
 			local entries = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -229,6 +231,7 @@ function Marks:toggle_window()
 	})
 
 	vim.api.nvim_create_autocmd("BufLeave", {
+		group = augroup,
 		buffer = buf,
 		callback = function()
 			local entries = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -239,6 +242,7 @@ function Marks:toggle_window()
 	})
 
 	vim.api.nvim_create_autocmd("QuitPre", {
+		group = augroup,
 		callback = function()
 			if vim.api.nvim_buf_is_valid(buf) then
 				vim.api.nvim_buf_delete(buf, { force = true })
@@ -277,7 +281,9 @@ end
 
 local marks = Marks:new()
 
+	group = augroup,
 vim.api.nvim_create_autocmd("QuitPre", {
+	group = augroup,
 	callback = function()
 		local json = vim.json.encode(marks.list)
 		vim.fn.writefile({ json }, data_file)
