@@ -1,11 +1,10 @@
----@alias RootPath string Path of the project root with an optional git branch appended.
----@alias FileInRoot string Path of the file inside a project.
+---@alias RootPath string Absolute path of the project root with an optional git branch appended.
+---@alias FilePath string Path of a file, relative if inside project, absolute otherwise.
 ---@alias MarkPos { row: integer, col: integer } Position of the mark.
----@alias Marks table<FileInRoot, MarkPos> Key-value table of files in project and their current mark position.
+---@alias Marks table<FilePath, table<integer, MarkPos>> Key-value table of files in project and their mark position.
 ---@alias MarksList table<RootPath, Marks> Key-value table of RootPaths with all their existing marks.
 
 -- setup
-local menu_id = math.random(100000)
 local data_dir = vim.fs.joinpath(vim.fn.stdpath("data"), "minipoon")
 local data_file = vim.fs.joinpath(data_dir, "marks.json")
 
@@ -18,71 +17,134 @@ end
 
 local lines = vim.fn.readfile(data_file)
 lines = table.concat(lines) -- vim.json.decode needs a pure string
----@type Marks
+---@type MarksList
 local marks_list_global = vim.json.decode(lines)
 
----@as RootPath
-local root = vim.fs.root(0, ".git") or vim.uv.cwd()
-if not root then
-	error("minipoon: couldn't get root directory: ")
-	return
+---@return RootPath
+local function get_root()
+	local git_root = vim.fs.root(0, ".git")
+	local root = git_root or vim.uv.cwd()
+	if not root then
+		error("minipoon: couldn't get root directory: ")
+	end
+	root = vim.fs.normalize(root)
+	return root
 end
-root = vim.fs.normalize(root)
-local root_key = root
 
-local in_git = vim.fs.root(0, ".git") and true or false
-if in_git then
+local function make_root_key(root)
+	local git_root = vim.fs.root(0, ".git")
+	if not git_root then
+		return root
+	end
+	local root_key = root
 	local branch = vim.system({ "git", "branch", "--show-current" }):wait()["stdout"]
 	if branch then
 		root_key = string.format("%s-%s", root_key, branch)
 	end
+	return root_key
+end
+
+---@param root RootPath
+---@return FilePath
+local function get_current_file(root)
+	local full_file_path = vim.fn.expand("%:p")
+	---@type FilePath
+	local current_file = vim.fs.relpath(root, full_file_path) or full_file_path
+	return current_file
 end
 
 -- functionality
+local menu_id = math.random(100000)
 local function get_menu_name()
 	menu_id = menu_id + 1
 	return "__minipoon__" .. menu_id
 end
-local Marks = {}
 
 local window = {
 	buf = -1,
 	win = -1,
 }
 
+local Marks = {}
+
 function Marks:new()
-	if not marks_list_global[root_key] then
-		marks_list_global[root_key] = {}
-	end
 	local marks = setmetatable({
-		root = root,
+		root = get_root(),
 		win_config = {},
-		list = marks_list_global[root_key],
+		list = marks_list_global,
 	}, {
 		__index = Marks,
 	})
 	return marks
 end
 
--- function Marks:_update_mark()
--- 	self:add_mark()
--- end
+function Marks:_get_list()
+	local root_key = make_root_key(self.root)
+	if not self.list[root_key] then
+		self.list[root_key] = {}
+	end
+	return self.list[root_key]
+end
 
-function Marks:_get_display()
-	return vim.tbl_keys(self.list)
+---@param list Marks
+function Marks:_set_list(list)
+	local root_key = make_root_key(self.root)
+	self.list[root_key] = list
+end
+
+function Marks:_get_next_index()
+	return tostring(vim.tbl_count(self:_get_list()) + 1)
+end
+
+function Marks:_get_mark_names()
+	local mark_names = {}
+	local list = self:_get_list()
+	for i = 1, vim.tbl_count(list) do
+		i = tostring(i)
+		local mark = list[i]
+		local mark_name = vim.tbl_keys(mark)[1]
+		table.insert(mark_names, mark_name)
+	end
+	return mark_names
+end
+
+---@return string?
+function Marks:_get_index_from_mark(mark_name)
+	for i, v in ipairs(self:_get_mark_names()) do
+		if v == mark_name then
+			return tostring(i)
+		end
+	end
+	return nil
 end
 
 function Marks:_get_pos(mark_entry_name)
-	local pos = self.list[mark_entry_name]
-	return pos.row, pos.col
+	local tbl = vim.tbl_values(self:_get_list())
+	local pos_tbl = vim.iter(tbl)
+		:filter(function(x)
+			return vim.tbl_keys(x)[1] == mark_entry_name
+		end)
+		:totable()
+	local pos = pos_tbl[1][mark_entry_name]
+	return { pos.row, pos.col }
+end
+
+function Marks:_mark_in_list(mark_name)
+	return vim.tbl_contains(self:_get_mark_names(), mark_name)
 end
 
 function Marks:_update_marks(marks_to_keep)
-	for k, _ in pairs(self.list) do
-		if not vim.tbl_contains(marks_to_keep, k) then
-			self.list[k] = nil
+	local mark_list = {}
+
+	-- filtering
+	for i, filename in ipairs(marks_to_keep) do
+		if self:_mark_in_list(filename) then
+			local mark_index = self:_get_index_from_mark(filename)
+			mark_list[tostring(i)] = self:_get_list()[mark_index]
 		end
 	end
+
+	self:_set_list(mark_list)
 end
 
 function Marks:_open(mark_entry_name)
@@ -112,15 +174,14 @@ function Marks:_open(mark_entry_name)
 end
 
 function Marks:add_mark()
-	local full_file_path = vim.fn.expand("%:p")
-	---@type FileInRoot
-	local current_file = vim.fs.relpath(root, full_file_path) or full_file_path
-	local row, col = vim.api.nvim_win_get_cursor(0)
-	self.list[current_file] = { row = row, col = col }
+	local current_file = get_current_file(self.root)
+	local index = self:_get_index_from_mark(current_file) or self:_get_next_index()
+	local pos = vim.api.nvim_win_get_cursor(0)
+	self:_get_list()[index] = { [current_file] = { row = pos[1], col = pos[2] } }
 end
 
 function Marks:close_window()
-	vim.api.nvim_win_hide(window.win)
+	vim.api.nvim_win_close(window.win, true)
 end
 
 function Marks:toggle_window()
@@ -129,12 +190,12 @@ function Marks:toggle_window()
 	local win_config = self.win_config or {}
 
 	if vim.api.nvim_win_is_valid(win) then
-		vim.api.nvim_win_hide(win)
+		self:close_window()
 		return
 	end
 
 	if not vim.api.nvim_buf_is_valid(buf) then
-		buf = vim.api.nvim_create_buf(false, false)
+		buf = vim.api.nvim_create_buf(false, true) -- scratch buffer!
 	end
 
 	vim.bo[buf].swapfile = false
@@ -150,7 +211,9 @@ function Marks:toggle_window()
 		buffer = buf,
 		callback = function()
 			local entries = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-			self:_update_marks(entries)
+			vim.schedule(function()
+				self:_update_marks(entries)
+			end)
 		end,
 	})
 
@@ -158,7 +221,15 @@ function Marks:toggle_window()
 		buffer = buf,
 		callback = function()
 			local entries = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-			self:_update_marks(entries)
+			vim.schedule(function()
+				self:_update_marks(entries)
+			end)
+		end,
+	})
+
+	vim.api.nvim_create_autocmd("VimLeavePre", {
+		callback = function()
+			vim.api.nvim_buf_delete(buf, {})
 		end,
 	})
 
@@ -183,7 +254,7 @@ function Marks:toggle_window()
 		border = "rounded",
 	}
 
-	local contents = self:_get_display()
+	local contents = self:_get_mark_names()
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, contents)
 
 	win_config = vim.tbl_deep_extend("force", win_config, default_opts)
@@ -191,5 +262,17 @@ function Marks:toggle_window()
 	window = { buf = buf, win = win }
 end
 
+vim.api.nvim_create_autocmd({ "QuitPre" }, {
+	callback = function()
+		for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+			local filetype = vim.bo[buf].filetype
+			if filetype == "minipoon" then
+				vim.api.nvim_buf_delete(buf, { force = true })
+			end
+		end
+	end,
+})
+
 local marks = Marks:new()
+
 return marks
