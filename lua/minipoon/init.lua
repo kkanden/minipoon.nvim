@@ -153,11 +153,15 @@ end
 function Marks:_update_marks(marks_to_keep)
 	local mark_list = {}
 
-	-- filtering
-	for i, filename in ipairs(marks_to_keep) do
+	-- need the index to be independent of the for loop because if the
+	-- if statement fails and the next one doesn't we'll end up with nils in
+	-- the list
+	local index = 1
+	for _, filename in pairs(marks_to_keep) do
 		if self:_mark_in_list(filename) then
 			local mark_index = self:_get_index_from_mark(filename)
-			mark_list[i] = self:_get_list()[mark_index]
+			mark_list[index] = self:_get_list()[mark_index]
+			index = index + 1
 		end
 	end
 
