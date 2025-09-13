@@ -212,6 +212,9 @@ end
 
 ---@param index integer
 function Marks:open_at(index)
+	if index > vim.tbl_count(self:_get_list()) then
+		return
+	end
 	local mark_name = self:_get_mark_name_from_index(index)
 	self:_open(mark_name)
 end
