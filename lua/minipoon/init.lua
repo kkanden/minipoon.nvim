@@ -144,6 +144,16 @@ function Marks:_get_pos(mark_name)
 end
 
 ---@param mark_name FilePath
+---@param pos MarkPos
+function Marks:_set_pos(mark_name, pos)
+	if not self:_mark_in_list(mark_name) then
+		return
+	end
+	local index = self:_get_index_from_mark(mark_name)
+	self:_get_list()[index][mark_name] = pos
+end
+
+---@param mark_name FilePath
 ---@return boolean
 function Marks:_mark_in_list(mark_name)
 	return vim.tbl_contains(self:_get_mark_names(), mark_name)
@@ -321,6 +331,15 @@ vim.api.nvim_create_autocmd("DirChanged", {
 	group = augroup,
 	callback = function()
 		marks.root = get_root()
+	end,
+})
+
+vim.api.nvim_create_autocmd("BufLeave", {
+	group = augroup,
+	callback = function()
+		local mark_name = get_current_file(marks.root)
+		local pos = vim.api.nvim_win_get_cursor(0)
+		marks:_set_pos(mark_name, { row = pos[1], col = pos[2] })
 	end,
 })
 
