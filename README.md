@@ -1,5 +1,5 @@
 A trimmed down version of the [harpoon](https://github.com/ThePrimeagen/harpoon/) plugin. This was made mainly due to
-the original harpoon no longer being unmaintained even on the harpoon 2 branch and the lack of certain features being
+the original harpoon no longer being maintained even on the harpoon 2 branch and the lack of certain features being
 built-in.
 
 Built-in features:
